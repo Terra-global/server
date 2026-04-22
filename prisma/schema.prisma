@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── USERS ────────────────────────────────────────────────
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String?  @map("password_hash")
+  googleId      String?  @unique @map("google_id")
+  username      String?  @unique
+  bio           String?  @default("")
+  website       String?
+  country       String?
+  avatarUrl     String?  @map("avatar_url")
+  isAdmin       Boolean  @default(false) @map("is_admin")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  farmTypeId    String?      @map("farm_type_id")
+  farmType      FarmType?    @relation(fields: [farmTypeId], references: [id])
+  socialLinks   SocialLink[]
+  
+  followers     Follow[]     @relation("following")
+  following     Follow[]     @relation("follower")
+  posts         Post[]
+  likes         Like[]
+  comments      Comment[]
+
+  @@map("users")
+}
+
+// ─── POSTS ────────────────────────────────────────────────
+model Post {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  imageUrl  String?  @map("image_url")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  likes     Like[]
+
+  @@map("posts")
+}
+
+// ─── COMMENTS ─────────────────────────────────────────────
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// ─── LIKES ────────────────────────────────────────────────
+model Like {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId]) // Prevents duplicate likes
+  @@map("likes")
+}
+
+// ─── FARM TYPES ──────────────────────────────────────────
+model FarmType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  @default("")
+  
+  users       User[]
+
+  @@map("farm_types")
+}
+
+// ─── SOCIAL LINKS ─────────────────────────────────────────
+model SocialLink {
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  platform String
+  url      String
+
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("social_links")
+}
+
+// ─── FOLLOWS ──────────────────────────────────────────────
+model Follow {
+  id           String   @id @default(uuid())
+  followerId   String   @map("follower_id")
+  followingId  String   @map("following_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  follower     User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following    User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+// ─── ADMIN WHITELIST ──────────────────────────────────────
+model AdminWhitelist {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  @@map("admin_whitelist")
+}
+
