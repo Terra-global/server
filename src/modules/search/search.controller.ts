@@ -6,10 +6,10 @@ import { ApiError } from "../../utils/ApiError";
 export const searchController = {
   search: asyncHandler(async (req: Request, res: Response) => {
     const query = typeof req.query.query === "string" ? req.query.query : "";
-    const type = typeof req.query.type === "string" ? req.query.type : "groups";
+    const type = typeof req.query.type === "string" ? req.query.type : "global";
 
-    if (!query || query.length < 2) {
-      throw ApiError.badRequest("Search query must be at least 2 characters long");
+    if (!query || query.length < 1) {
+      return res.json({ success: true, data: { users: [], posts: [] } });
     }
 
     if (type === "users") {
@@ -17,6 +17,12 @@ export const searchController = {
       return res.json({ success: true, data: users });
     }
 
-    res.json({ success: true, data: [] });
+    if (type === "posts") {
+      const posts = await searchService.searchPosts(query);
+      return res.json({ success: true, data: posts });
+    }
+
+    const results = await searchService.globalSearch(query);
+    return res.json({ success: true, data: results });
   }),
 };

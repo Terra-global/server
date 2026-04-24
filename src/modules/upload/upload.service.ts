@@ -43,5 +43,17 @@ export const uploadService = {
       console.error("R2 Upload Error:", error);
       throw ApiError.internal(`Upload failed: ${error.message}`);
     }
+  },
+
+  /**
+   * Upload multiple files to Cloudflare R2
+   */
+  async uploadMultiple(files: Express.Multer.File[], folder: string = "general") {
+    if (!files || files.length === 0) {
+      throw ApiError.badRequest("No files provided");
+    }
+
+    const uploadPromises = files.map(file => this.uploadFile(file, folder));
+    return Promise.all(uploadPromises);
   }
 };

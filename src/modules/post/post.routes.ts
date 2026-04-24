@@ -15,5 +15,7 @@ router.post("/:id/like", authenticate, postController.toggleLike);
 router.post("/:id/comments", authenticate, postController.addComment);
 router.get("/:id/comments", postController.getComments);
 router.get("/user/:userId", optionalAuthenticate, postController.getUserPosts);
+router.get("/user/:userId/likes", optionalAuthenticate, postController.getLikedPosts);
+router.delete("/:id", authenticate, postController.delete);
 
 export default router;

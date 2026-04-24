@@ -4,14 +4,35 @@ import { postService } from "./post.service";
 export class PostController {
   async create(req: Request, res: Response) {
     try {
-      const { content, imageUrl } = req.body;
+      const { 
+        content, 
+        imageUrls, 
+        tags,
+        postType,
+        price,
+        priceUnit,
+        quantity,
+        quantityUnit,
+        location
+      } = req.body;
       const userId = (req as any).user.userId;
 
-      if (!content && !imageUrl) {
-        return res.status(400).json({ success: false, message: "Post must have content or an image" });
+      if (!content && (!imageUrls || imageUrls.length === 0)) {
+        return res.status(400).json({ success: false, message: "Post must have content or at least one image" });
       }
 
-      const post = await postService.createPost({ content, imageUrl, userId });
+      const post = await postService.createPost({ 
+        content, 
+        imageUrls, 
+        tags, 
+        userId,
+        postType,
+        price: price ? Number(price) : undefined,
+        priceUnit,
+        quantity: quantity ? Number(quantity) : undefined,
+        quantityUnit,
+        location
+      });
 
       return res.status(201).json({ success: true, data: post });
     } catch (error: any) {
@@ -93,6 +114,28 @@ export class PostController {
       const userId = req.params.userId as string;
       const currentUserId = (req as any).user?.userId;
       const posts = await postService.getUserPosts(userId, currentUserId);
+      return res.status(200).json({ success: true, data: posts });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async delete(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = (req as any).user.userId;
+
+      await postService.deletePost(id, userId);
+      return res.status(200).json({ success: true, message: "Post deleted successfully" });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getLikedPosts(req: Request, res: Response) {
+    try {
+      const userId = req.params.userId as string;
+      const posts = await postService.getLikedPosts(userId);
       return res.status(200).json({ success: true, data: posts });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });

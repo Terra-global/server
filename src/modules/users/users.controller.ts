@@ -50,4 +50,22 @@ export const usersController = {
       data: result,
     });
   }),
+
+  getFollowing: asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const following = await usersService.getFollowing(userId);
+    res.json({
+      success: true,
+      data: following,
+    });
+  }),
+
+  getReferrals: asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+    const referrals = await usersService.getReferrals(userId);
+    res.json({
+      success: true,
+      data: referrals,
+    });
+  }),
 };

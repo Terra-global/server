@@ -1,6 +1,7 @@
 import prisma from "../../config/database";
 import { ApiError } from "../../utils/ApiError";
 import { UpdateProfileInput } from "./users.schema";
+import { notificationService, NotificationType } from "../notification/notification.service";
 
 export const usersService = {
   /**
@@ -52,7 +53,7 @@ export const usersService = {
    * Get a user's public profile by ID.
    */
   async getPublicProfile(userId: string, currentUserId?: string) {
-    const user = await prisma.user.findUnique({
+    const user = await (prisma.user as any).findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -71,6 +72,7 @@ export const usersService = {
             followers: true,
             following: true,
             posts: true,
+            referrals: true,
           }
         },
         createdAt: true,
@@ -120,6 +122,14 @@ export const usersService = {
       await prisma.follow.create({
         data: { followerId, followingId }
       });
+
+      // Create notification
+      await notificationService.createNotification({
+        type: NotificationType.FOLLOW,
+        userId: followingId,
+        actorId: followerId,
+      });
+
       return { following: true };
     }
   },
@@ -130,6 +140,44 @@ export const usersService = {
   async getFarmTypes() {
     return prisma.farmType.findMany({
       orderBy: { name: "asc" },
+    });
+  },
+
+  /**
+   * Get all users that a user follows.
+   */
+  async getFollowing(userId: string) {
+    const following = await prisma.follow.findMany({
+      where: { followerId: userId },
+      include: {
+        following: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+            farmType: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    return following.map(f => f.following);
+  },
+
+  /**
+   * Get all users referred by a specific user.
+   */
+  async getReferrals(userId: string) {
+    return (prisma.user as any).findMany({
+      where: { referredById: userId },
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+        createdAt: true,
+        farmType: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
     });
   },
 };

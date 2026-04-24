@@ -6,6 +6,8 @@ import { ApiError } from "../../utils/ApiError";
 import { RegisterInput, LoginInput } from "./auth.schema";
 import { AuthPayload } from "../../middleware/auth";
 import { OAuth2Client } from "google-auth-library";
+import { notificationService, NotificationType } from "../notification/notification.service";
+import { nanoid } from "nanoid";
 
 const client = new OAuth2Client(config.googleClientId);
 
@@ -40,22 +42,48 @@ export const authService = {
     // Hash password
     const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
 
+    // Handle referral
+    let referredByUserId: string | undefined;
+    if (data.referralCode) {
+      const referrer = await (prisma.user as any).findFirst({
+        where: { referralCode: data.referralCode },
+      });
+      if (referrer) {
+        referredByUserId = referrer.id;
+      }
+    }
+
+    // Generate unique referral code for new user
+    const userReferralCode = nanoid(8).toUpperCase();
+
     // Create user
-    const user = await prisma.user.create({
+    const user = await (prisma.user as any).create({
       data: {
         email: data.email,
         passwordHash,
         country: data.country,
         isAdmin: !!isWhitelisted,
+        referralCode: userReferralCode,
+        referredById: referredByUserId,
       },
       select: {
         id: true,
         email: true,
         country: true,
         isAdmin: true,
+        referralCode: true,
         createdAt: true,
       },
     });
+
+    // Notify referrer
+    if (referredByUserId) {
+      await notificationService.createNotification({
+        type: NotificationType.REFERRAL,
+        userId: referredByUserId,
+        actorId: user.id,
+      });
+    }
 
     // Generate JWT
     const token = generateToken({
@@ -71,7 +99,7 @@ export const authService = {
    * Login with email and password.
    */
   async login(data: LoginInput) {
-    const user = await prisma.user.findUnique({
+    const user = await (prisma.user as any).findUnique({
       where: { email: data.email },
     });
 
@@ -99,6 +127,7 @@ export const authService = {
         country: user.country,
         bio: user.bio,
         avatarUrl: user.avatarUrl,
+        referralCode: user.referralCode,
         isAdmin: user.isAdmin,
         createdAt: user.createdAt,
       },
@@ -110,7 +139,7 @@ export const authService = {
    * Get current user profile from token.
    */
   async getMe(userId: string) {
-    const user = await prisma.user.findUnique({
+    let user = await (prisma.user as any).findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -126,6 +155,7 @@ export const authService = {
         socialLinks: {
           select: { platform: true, url: true }
         },
+        referralCode: true,
         isAdmin: true,
         createdAt: true,
       },
@@ -133,6 +163,27 @@ export const authService = {
 
     if (!user) {
       throw ApiError.notFound("User not found");
+    }
+
+    if (!user.referralCode) {
+      user = await (prisma.user as any).update({
+        where: { id: userId },
+        data: { referralCode: nanoid(8).toUpperCase() },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          country: true,
+          bio: true,
+          avatarUrl: true,
+          website: true,
+          farmType: { select: { id: true, name: true } },
+          socialLinks: { select: { platform: true, url: true } },
+          referralCode: true,
+          isAdmin: true,
+          createdAt: true,
+        },
+      });
     }
 
     return user;
@@ -154,17 +205,18 @@ export const authService = {
       if (!email) throw ApiError.unauthorized("Email not found in Google account");
 
       // Find or create user
-      let user = await prisma.user.findUnique({
+      let user = await (prisma.user as any).findUnique({
         where: { email },
       });
 
       if (!user) {
-        user = await prisma.user.create({
+        user = await (prisma.user as any).create({
           data: {
             email,
             googleId,
             username: name?.replace(/\s+/g, '').toLowerCase() || email.split('@')[0],
             avatarUrl: picture,
+            referralCode: nanoid(8).toUpperCase(),
           },
         });
       } else if (!user.googleId) {

@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  // directUrl = env("DIRECT_URL")
 }
 
 // ─── USERS ────────────────────────────────────────────────
@@ -33,22 +33,49 @@ model User {
   posts         Post[]
   likes         Like[]
   comments      Comment[]
+  notifications Notification[] @relation("recipient")
+  triggeredActions Notification[] @relation("actor")
+
+  // Messaging
+  sentMessages      Message[]      @relation("sender")
+  conversations     ConversationParticipant[]
+
+  // Referral System
+  referralCode  String?  @unique @map("referral_code")
+  referredById  String?  @map("referred_by_id")
+  referredBy    User?    @relation("referrals", fields: [referredById], references: [id])
+  referrals     User[]   @relation("referrals")
+
+  // Market Square
+  createdSquares    MarketSquare[] @relation("createdSquares")
+  squareParticipations SquareParticipant[]
+  squareMessages    SquareMessage[]
 
   @@map("users")
 }
 
 // ─── POSTS ────────────────────────────────────────────────
 model Post {
-  id        String   @id @default(uuid())
-  content   String   @db.Text
-  imageUrl  String?  @map("image_url")
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String    @id @default(uuid())
+  postType      PostType  @default(REGULAR)
+  content       String    @db.Text
+  imageUrls     String[]  @default([]) @map("image_urls")
+  tags          String[]  @default([])
+  userId        String    @map("user_id")
+  views         Int       @default(0)
+  // Marketplace fields (optional — used when postType = FOR_SALE or LOOKING_FOR)
+  price         Float?
+  priceUnit     String?   @map("price_unit")    // e.g. "per kg", "per bag", "per unit"
+  quantity      Float?
+  quantityUnit  String?   @map("quantity_unit") // e.g. "kg", "bags", "tonnes"
+  location      String?   // e.g. "Kano, Nigeria"
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments  Comment[]
   likes     Like[]
+  notifications Notification[]
 
   @@map("posts")
 }
@@ -127,4 +154,119 @@ model AdminWhitelist {
 
   @@map("admin_whitelist")
 }
+
+// ─── NOTIFICATIONS ────────────────────────────────────────
+model Notification {
+  id          String           @id @default(uuid())
+  type        NotificationType
+  userId      String           @map("user_id") // Recipient
+  actorId     String           @map("actor_id") // Person who triggered
+  postId      String?          @map("post_id")
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user        User             @relation("recipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor       User             @relation("actor", fields: [actorId], references: [id], onDelete: Cascade)
+  post        Post?            @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@map("notifications")
+}
+
+// ─── CONVERSATIONS ────────────────────────────────────────
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  userId         String       @map("user_id")
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// ─── MESSAGES ─────────────────────────────────────────────
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  senderId       String       @map("sender_id")
+  content        String       @db.Text
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────
+enum PostType {
+  REGULAR
+  FOR_SALE
+  LOOKING_FOR
+}
+
+enum NotificationType {
+  LIKE
+  FOLLOW
+  COMMENT
+  MESSAGE
+  REFERRAL
+}
+
+model MarketSquare {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  creatorId   String
+  creator     User     @relation("createdSquares", fields: [creatorId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  endedAt     DateTime?
+
+  participants SquareParticipant[]
+  messages     SquareMessage[]
+
+  @@map("market_squares")
+}
+
+model SquareParticipant {
+  id             String       @id @default(uuid())
+  squareId       String
+  square         MarketSquare @relation(fields: [squareId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  isOnStage      Boolean      @default(false)
+  isHandRaised   Boolean      @default(false)
+  joinedAt       DateTime     @default(now())
+
+  @@unique([squareId, userId])
+  @@map("square_participants")
+}
+
+model SquareMessage {
+  id        String       @id @default(uuid())
+  squareId  String
+  square    MarketSquare @relation(fields: [squareId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime     @default(now())
+
+  @@map("square_messages")
+}
+
 

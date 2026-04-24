@@ -11,5 +11,7 @@ router.get("/profile/:id", optionalAuthenticate, usersController.getProfile);
 // Protected routes
 router.patch("/profile", authenticate, usersController.updateProfile);
 router.post("/follow/:id", authenticate, usersController.toggleFollow);
+router.get("/following", authenticate, usersController.getFollowing);
+router.get("/referrals", authenticate, usersController.getReferrals);
 
 export default router;

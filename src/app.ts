@@ -13,6 +13,9 @@ import usersRoutes from "./modules/users/users.routes";
 import searchRoutes from "./modules/search/search.routes";
 import uploadRoutes from "./modules/upload/upload.routes";
 import postRoutes from "./modules/post/post.routes";
+import notificationRoutes from "./modules/notification/notification.routes";
+import messageRoutes from "./modules/message/message.routes";
+import squareRoutes from "./modules/post/square.routes";
 
 const app = express();
 
@@ -27,12 +30,26 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── HEALTH CHECK ─────────────────────────────────────────
-app.get("/api/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    environment: config.nodeEnv,
-  });
+import { prisma } from "./config/database";
+
+app.get("/api/health", async (_req, res) => {
+  try {
+    // A lightweight query to keep the Neon database awake
+    await prisma.$queryRaw`SELECT 1`;
+    
+    res.json({
+      status: "ok",
+      db: "connected",
+      timestamp: new Date().toISOString(),
+      environment: config.nodeEnv,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      db: "disconnected",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 app.get("/api", (_req, res) => {
@@ -52,6 +69,9 @@ app.use("/api/users", usersRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/squares", squareRoutes);
 
 // ─── 404 HANDLER ──────────────────────────────────────────
 app.use((_req, res) => {

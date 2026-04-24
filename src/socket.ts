@@ -38,6 +38,39 @@ export const initSocket = (server: HTTPServer) => {
     socket.on("disconnect", () => {
       console.log(`🔌 User disconnected: ${user.email}`);
     });
+
+    // ─── MARKET SQUARE EVENTS ───────────────────────────────
+    socket.on("join-square", (squareId: string) => {
+      socket.join(`square:${squareId}`);
+      console.log(`🏠 User ${user.email} joined square room: ${squareId}`);
+    });
+
+    socket.on("leave-square", (squareId: string) => {
+      socket.leave(`square:${squareId}`);
+      console.log(`🏠 User ${user.email} left square room: ${squareId}`);
+    });
+
+    socket.on("send-square-message", (data: { squareId: string, message: any }) => {
+      io.to(`square:${data.squareId}`).emit("new-square-message", data.message);
+    });
+
+    socket.on("update-square-stage", (data: { squareId: string, participant: any }) => {
+      io.to(`square:${data.squareId}`).emit("stage-updated", data.participant);
+    });
+
+    socket.on("raise-square-hand", (data: { squareId: string, userId: string, status: boolean }) => {
+      io.to(`square:${data.squareId}`).emit("hand-raised", data);
+    });
+
+    socket.on("audio-stream", (data: { squareId: string, audioData: string, userId: string }) => {
+      // Broadcast to everyone else in the room
+      socket.to(`square:${data.squareId}`).emit("audio-stream", data);
+    });
+
+    socket.on("end-square", (squareId: string) => {
+      io.to(`square:${squareId}`).emit("square-ended");
+      // Optional: force all sockets to leave the room
+    });
   });
 
   return io;

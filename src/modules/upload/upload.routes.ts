@@ -29,4 +29,12 @@ router.post(
   uploadController.uploadSingle
 );
 
+// Route for multiple files upload (protected by auth)
+router.post(
+  "/multiple",
+  authenticate,
+  upload.array("files", 10), // Limit to 10 files
+  uploadController.uploadMultiple
+);
+
 export default router;

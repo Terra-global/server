@@ -4,6 +4,7 @@ export const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   country: z.string().min(1, "Country is required"),
+  referralCode: z.string().optional(),
 });
 
 export const loginSchema = z.object({
