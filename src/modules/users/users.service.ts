@@ -161,6 +161,7 @@ export const usersService = {
       },
     });
 
+    console.log(`[UsersService] Found ${following.length} following for user ${userId}`);
     return following.map(f => f.following);
   },
 
