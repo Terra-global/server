@@ -33,6 +33,19 @@ async function main() {
   ║    WS:   ws://localhost:${config.port}             ║
   ╚══════════════════════════════════════════╝
     `);
+    // ─── Keep-Alive for Render Free Tier ─────────────────
+    if (config.nodeEnv === "production") {
+      const RENDER_URL = "https://server-sr85.onrender.com/api/health";
+      const INTERVAL_MS = 14 * 60 * 1000; // 14 minutes
+      setInterval(async () => {
+        try {
+          await fetch(RENDER_URL);
+          console.log("🏓 Keep-alive ping sent");
+        } catch {
+          // silently ignore
+        }
+      }, INTERVAL_MS);
+    }
   });
 }
 
